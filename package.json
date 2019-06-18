@@ -1,0 +1,45 @@
+{
+  "name": "prime-casino-contracts",
+  "version": "0.1.0",
+  "author": "LeapDAO",
+  "license": "MPL-2.0",
+  "keywords": [
+    "prime",
+    "solidity",
+    "casino"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leapdao/prime-casino-contracts.git"
+  },
+  "main": "utils/index.js",
+  "scripts": {
+    "test": "yarn test:contracts",
+    "test:contracts": "scripts/test.sh test/*",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:sol": "solhint contracts/*.{sol,slb}",
+    "lint:all": "yarn lint && yarn lint:sol",
+    "lint:all:fix": "yarn lint:fix && yarn lint:sol",
+    "console": "truffle console",
+    "compile:contracts": "truffle compile",
+    "version": "scripts/version.js",
+    "coverage": "scripts/coverage.sh"
+  },
+  "devDependencies": {
+    "eslint": "^4.11.0",
+    "eslint-config-standard": "^10.2.1",
+    "eslint-plugin-import": "^2.8.0",
+    "eslint-plugin-node": "^5.2.1",
+    "eslint-plugin-promise": "^3.6.0",
+    "eslint-plugin-standard": "^3.0.1",
+    "ganache-cli": "=6.4.0",
+    "mocha": "=6.1.4",
+    "solhint": "^1.2.1",
+    "truffle": "=5.0.22"
+  },
+  "dependencies": {
+    "ethers": "^4.0.13",
+    "openzeppelin-solidity": "=2.1.1"
+  }
+}
