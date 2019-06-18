@@ -6,7 +6,7 @@ const ethers = require('ethers');
 
 contract('PrimeCasino', () => {
   let provider = ethers.getDefaultProvider();
-  const evmParamHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
+  const taskHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
   const resHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
   const path = '0x1100000000000000000000000000000000000000000000000000000000000011';
   const yesHash = ethers.utils.solidityKeccak256(['bytes32'],['0x0000000000000000000000000000000000000000000000000000000000000001']);
@@ -18,34 +18,34 @@ contract('PrimeCasino', () => {
   it('should allow to bet and win', async () => {
     // prepare mock
     enforcer = await deployContract(EnforcerMock);
-    let tx = await enforcer.setChallengeEndTime(1);
+    let tx = await enforcer.registerResult(taskHash, path, yesHash);
     await tx.wait();
-    tx = await enforcer.addPathAndResult(path, yesHash);
+    tx = await enforcer.finalizeTask(taskHash);
     await tx.wait();
 
     // deploy casino
     casino = await deployContract(PrimeCasino, enforcer.address, minBet);
     // register execution and check state
-    tx = await casino.request(resHash, evmParamHash, {value: minBet});
+    tx = await casino.request(resHash, taskHash, {value: minBet});
     await tx.wait();
-    tx = await casino.payout(evmParamHash, { gasLimit: 0x0fffffffffffff});
+    tx = await casino.payout(taskHash, { gasLimit: 0x0fffffffffffff});
     tx = await tx.wait();
   });
 
   it('should allow to bet and loose', async () => {
     // prepare mock
     enforcer = await deployContract(EnforcerMock);
-    let tx = await enforcer.setChallengeEndTime(1);
+    let tx = await enforcer.registerResult(taskHash, path, noHash);
     await tx.wait();
-    tx = await enforcer.addPathAndResult(path, noHash);
+    tx = await enforcer.finalizeTask(taskHash);
     await tx.wait();
 
     // deploy casino
     casino = await deployContract(PrimeCasino, enforcer.address, minBet);
     // register execution and check state
-    tx = await casino.request(resHash, evmParamHash, {value: minBet});
+    tx = await casino.request(resHash, taskHash, {value: minBet});
     await tx.wait();
-    tx = casino.payout(evmParamHash, { gasLimit: 0x0fffffffffffff});
+    tx = casino.payout(taskHash, { gasLimit: 0x0fffffffffffff});
     await assertRevert(tx, 'revert bet prime, but not found prime');
   });
 });
