@@ -1,5 +1,5 @@
 pragma solidity ^0.5.2;
-
+pragma experimental ABIEncoderV2;
 import "./IEnforcer.sol";
 
 contract EnforcerMock is IEnforcer {
@@ -12,7 +12,9 @@ contract EnforcerMock is IEnforcer {
 
   mapping(bytes32 => Task) tasks;
 
-  function registerResult(bytes32 _taskHash, bytes32 _pathRoot, bytes32 _resultHash) public {
+  event Registered(bytes32 indexed _taskHash, bytes32 indexed _pathRoot, bytes result);
+
+  function registerResult(bytes32 _taskHash, bytes32 _pathRoot, bytes memory result) public {
     if (tasks[_taskHash].challengeEndTime == 0) {
       bytes32[] memory empty = new bytes32[](0);
       tasks[_taskHash] = Task({
@@ -22,18 +24,29 @@ contract EnforcerMock is IEnforcer {
       });
     }
     tasks[_taskHash].pathRoots.push(_pathRoot);
-    tasks[_taskHash].results.push(_resultHash);
+    tasks[_taskHash].results.push(keccak256(result));
+    emit Registered(_taskHash, _pathRoot, result);
   }
 
   function finalizeTask(bytes32 _taskHash) public {
     tasks[_taskHash].challengeEndTime = now - 1;
   }
 
-  event Request(bytes32 indexed _taskHash, bytes32 resourceHash);
+  event Request(bytes32 indexed _taskHash, bytes _data);
+
+  function parameterHash(EVMParameters memory _parameters) internal returns (bytes32) {
+    return keccak256(
+      abi.encodePacked(
+        _parameters.codeHash,
+        _parameters.dataHash
+      )
+    );
+  }
     
-  function request(bytes32 _resourceHash, bytes32 _taskHash) public returns (bool) {
-		emit Request(_taskHash, _resourceHash);
-    return (tasks[_taskHash].pathRoots.length == 0 || tasks[_taskHash].pathRoots[0] != _resourceHash);
+  function request(EVMParameters memory _params, bytes memory _data) public returns (bytes32) {
+    bytes32 taskHash = parameterHash(_params);
+		emit Request(taskHash, _data);
+    return taskHash;
   }
 
   function getStatus(bytes32 _taskHash) public view returns (uint256, bytes32[] memory, bytes32[] memory) {

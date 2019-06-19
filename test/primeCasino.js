@@ -6,46 +6,48 @@ const ethers = require('ethers');
 
 contract('PrimeCasino', () => {
   let provider = ethers.getDefaultProvider();
-  const taskHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
-  const resHash = '0x0000000000000000000000000000000000000000000000000000000000000000';
   const path = '0x1100000000000000000000000000000000000000000000000000000000000011';
-  const yesHash = ethers.utils.solidityKeccak256(['bytes32'],['0x0000000000000000000000000000000000000000000000000000000000000001']);
-  const noHash = ethers.utils.solidityKeccak256(['bytes32'],['0x0000000000000000000000000000000000000000000000000000000000000000']);
+  const yesHash = ethers.utils.solidityKeccak256(['bytes'],['0x01']);
+  console.log(yesHash);
+  const noHash = ethers.utils.solidityKeccak256(['bytes'],['0x00']);
   const minBet = toBN('100000000000000000');
   let casino;
   let enforcer;
 
-  it('should allow to bet and win', async () => {
-    // prepare mock
+  before(async () => {
+    // prepare enforcer
     enforcer = await deployContract(EnforcerMock);
-    let tx = await enforcer.registerResult(taskHash, path, yesHash);
+    // deploy casino
+    casino = await deployContract(PrimeCasino, enforcer.address, enforcer.address, minBet);    
+  });
+
+  it('should allow to bet and win', async () => {
+    // register execution and check state
+    let tx = await casino.request(123, {value: minBet});
+    tx = await tx.wait();
+    const taskHash = tx.logs[1].topics[2];
+
+    // deliver result
+    tx = await enforcer.registerResult(taskHash, path, "0x01");
     await tx.wait();
     tx = await enforcer.finalizeTask(taskHash);
     await tx.wait();
-
-    // deploy casino
-    casino = await deployContract(PrimeCasino, enforcer.address, minBet);
-    // register execution and check state
-    tx = await casino.request(resHash, taskHash, {value: minBet});
-    await tx.wait();
-    tx = await casino.payout(taskHash, { gasLimit: 0x0fffffffffffff});
+    tx = await casino.payout(123, { gasLimit: 0x0fffffffffffff});
     tx = await tx.wait();
   });
 
   it('should allow to bet and loose', async () => {
-    // prepare mock
-    enforcer = await deployContract(EnforcerMock);
-    let tx = await enforcer.registerResult(taskHash, path, noHash);
+    // register execution and check state
+    let tx = await casino.request(234, {value: minBet});
+    tx = await tx.wait();
+    const taskHash = tx.logs[1].topics[2];
+
+    // deliver result
+    tx = await enforcer.registerResult(taskHash, path, "0x00");
     await tx.wait();
     tx = await enforcer.finalizeTask(taskHash);
     await tx.wait();
-
-    // deploy casino
-    casino = await deployContract(PrimeCasino, enforcer.address, minBet);
-    // register execution and check state
-    tx = await casino.request(resHash, taskHash, {value: minBet});
-    await tx.wait();
-    tx = casino.payout(taskHash, { gasLimit: 0x0fffffffffffff});
+    tx = casino.payout(234, { gasLimit: 0x0fffffffffffff});
     await assertRevert(tx, 'revert bet prime, but not found prime');
   });
 });
