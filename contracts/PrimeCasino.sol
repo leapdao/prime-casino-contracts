@@ -4,7 +4,8 @@ import "./IEnforcer.sol";
 
 contract PrimeCasino {
 
-	event NewPrime(uint256 indexed prime, bytes32 indexed taskHash);
+	event NewPrime(uint256 indexed prime, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
+  event NewBet(uint256 indexed prime, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
 
 	uint256 public minBet;
 	address public enforcerAddr;
@@ -48,7 +49,7 @@ contract PrimeCasino {
   		sumYes: msg.value,
   		sumNo: 0
 		});
-		emit NewPrime(_primeNumber, taskHash);
+		emit NewPrime(_primeNumber, taskHash, msg.value, 0);
   }
 
   function bet(uint256 _primeNumber, bool _isPrime) public payable {
@@ -59,19 +60,31 @@ contract PrimeCasino {
   	(endTime ,,) = enforcer.getStatus(taskHash);
   	require(endTime > 0, "not a known bet");
   	require(endTime > now, "bet duration expired");
+    Sum memory sum = primeBetSums[_primeNumber];
   	if (_isPrime) {
   		primeBets[_primeNumber][msg.sender] += int256(msg.value);
-  		primeBetSums[_primeNumber].sumYes += msg.value;
+  		sum.sumYes += msg.value;
   	} else {
   		primeBets[_primeNumber][msg.sender] -= int256(msg.value);
-  		primeBetSums[_primeNumber].sumNo += msg.value;
+  		sum.sumNo += msg.value;
   	}
+    emit NewBet(_primeNumber, taskHash, sum.sumYes, sum.sumNo);
   }
 
   function getStatus(uint256 _primeNumber) public view returns (uint256 _challengeEndTime, bytes32[] memory _pathRoots) {
-  	bytes32 taskHash = primeBetSums[_primeNumber].taskHash;
+    Sum memory sum = primeBetSums[_primeNumber];
+    require(sum.sumYes > 0, "number has not been requested yet");
+  	bytes32 taskHash = sum.taskHash;
   	IEnforcer enforcer = IEnforcer(enforcerAddr);
   	(_challengeEndTime, _pathRoots,) = enforcer.getStatus(taskHash);
+    if (_challengeEndTime == 0) {
+      // why here and not in enforcerMock?
+      // we only want to start the callenge duration after the first result has been
+      // submitted. computation might be long running.
+      // for UI purposes we still return a value here, to distinguish from 
+      // non-existing tasks.
+      _challengeEndTime = now + 2 hours;
+    }
   }
 
   function payout(uint256 _primeNumber) public {
