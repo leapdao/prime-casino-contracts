@@ -4,8 +4,8 @@ import "./IEnforcer.sol";
 
 contract PrimeCasino {
 
-	event NewPrime(uint256 indexed prime, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
-  event NewBet(uint256 indexed prime, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
+	event NewCandidatePrime(uint256 indexed number, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
+  event NewBet(uint256 indexed number, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
 
 	uint256 public minBet;
 	address public enforcerAddr;
@@ -26,11 +26,20 @@ contract PrimeCasino {
 		primeTester = _primeTester;
 	}
     
-  // calling request bets on yesPrime automatically
-  function request(uint256 _primeNumber) public payable {
+  /**
+   * @dev request a new `canditateNumber` to be checked for primality.
+   *
+   * Emits an `NewCandidatePrime` event indicating the registration for computation.
+   *
+   * Requirements:
+   *
+   * - `msg.value` has to be at least `minBet`.
+   * - `canditateNumber` should not have been registered before.
+   */
+  function request(uint256 _candidateNumber) public payable {
   	require(msg.value >= minBet, "Not enough ether sent to pay for bet");
   	IEnforcer enforcer = IEnforcer(enforcerAddr);
-  	bytes memory data = abi.encodePacked(_primeNumber);
+  	bytes memory data = abi.encodePacked(_candidateNumber);
   	IEnforcer.EVMParameters memory params = IEnforcer.EVMParameters({
 			origin: msg.sender,
 	  	target: primeTester,
@@ -43,37 +52,63 @@ contract PrimeCasino {
 	    dataHash: keccak256(data)
   	});
   	bytes32 taskHash = enforcer.request(params, data);
-  	primeBets[_primeNumber][msg.sender] = int256(msg.value);
-  	primeBetSums[_primeNumber] = Sum({
+  	primeBets[_candidateNumber][msg.sender] = int256(msg.value);
+  	primeBetSums[_candidateNumber] = Sum({
   		taskHash: taskHash,
   		sumYes: msg.value,
   		sumNo: 0
 		});
-		emit NewPrime(_primeNumber, taskHash, msg.value, 0);
+		emit NewCandidatePrime(_candidateNumber, taskHash, msg.value, 0);
   }
 
-  function bet(uint256 _primeNumber, bool _isPrime) public payable {
+  /**
+   * @dev adds a new yes/no bet as `isPrime` on `canditateNumber`.
+   *
+   * Emits an `NewBet` event indicating the registration of the bet.
+   *
+   * Requirements:
+   *
+   * - `msg.value` has to be at least `minBet`.
+   * - `canditateNumber` should have been registered before.
+   * - `canditateNumber` should not have passed challengeEndTime yet.
+   */
+  function bet(uint256 _candidateNumber, bool _isPrime) public payable {
   	require(msg.value >= minBet, "Not enough ether sent to pay for bet");
   	uint256 endTime;
-  	bytes32 taskHash = primeBetSums[_primeNumber].taskHash;
+  	bytes32 taskHash = primeBetSums[_candidateNumber].taskHash;
   	IEnforcer enforcer = IEnforcer(enforcerAddr);
   	(endTime ,,) = enforcer.getStatus(taskHash);
   	require(endTime > 0, "not a known bet");
   	require(endTime > now, "bet duration expired");
-    Sum memory sum = primeBetSums[_primeNumber];
+    Sum memory sum = primeBetSums[_candidateNumber];
   	if (_isPrime) {
-  		primeBets[_primeNumber][msg.sender] += int256(msg.value);
+  		primeBets[_candidateNumber][msg.sender] += int256(msg.value);
   		sum.sumYes += msg.value;
   	} else {
-  		primeBets[_primeNumber][msg.sender] -= int256(msg.value);
+  		primeBets[_candidateNumber][msg.sender] -= int256(msg.value);
   		sum.sumNo += msg.value;
   	}
-    emit NewBet(_primeNumber, taskHash, sum.sumYes, sum.sumNo);
+    emit NewBet(_candidateNumber, taskHash, sum.sumYes, sum.sumNo);
   }
 
-  function getStatus(uint256 _primeNumber) public view returns (uint256 _challengeEndTime, bytes32[] memory _pathRoots) {
-    Sum memory sum = primeBetSums[_primeNumber];
-    require(sum.sumYes > 0, "number has not been requested yet");
+  /**
+   * @dev Returns the status for a given `candidateNumber` that is a potentially prime.
+   *
+   * the return values should be interpreted like this:
+   * 
+   * |                       | challengeEndTime > now                                             | challengeEndTime <= now && challengeEndTime > 0                       | challengeEndTime == 0 |
+   * |-----------------------|--------------------------------------------------------------------|-----------------------------------------------------------------------|-----------------------|
+   * | pathRoots.length == 0 | no computation result registered yet. initial state after request. | computation market could not deliver any solution to given task.      | not requested         |
+   * | pathRoots.length == 1 | first result registered. open for challenges.                      | exactly 1 result found. result can be used.                           | not requested         |
+   * | pathRoots.length > 1  | some existing result challenged. cDance in progress.               | more than one result survived the cDance, computation market failed.  | not requested         |
+   *
+   */
+  function getStatus(uint256 _candidateNumber) public view returns (uint256 _challengeEndTime, bytes32[] memory _pathRoots) {
+    Sum memory sum = primeBetSums[_candidateNumber];
+    if (sum.sumYes == 0 && sum.sumNo == 0) {
+      // this number has not been requested yet
+      return (_challengeEndTime, _pathRoots);
+    }
   	bytes32 taskHash = sum.taskHash;
   	IEnforcer enforcer = IEnforcer(enforcerAddr);
   	(_challengeEndTime, _pathRoots,) = enforcer.getStatus(taskHash);
@@ -87,13 +122,21 @@ contract PrimeCasino {
     }
   }
 
-  function payout(uint256 _primeNumber) public {
-  	int256 betAmount = primeBets[_primeNumber][msg.sender];
+  /**
+   * @dev pays out `msg.sender` on `canditateNumber`.
+   *
+   * Requirements:
+   *
+   * - `msg.sender` should have bet on this number before.
+   * - `canditateNumber` should have passed challengeEndTime.
+   */
+  function payout(uint256 _candidateNumber) public {
+  	int256 betAmount = primeBets[_candidateNumber][msg.sender];
   	require(betAmount != 0, "no bet amount");
   	uint256 endTime;
   	bytes32[] memory pathRoots;
   	bytes32[] memory results;
-  	bytes32 taskHash = primeBetSums[_primeNumber].taskHash;
+  	bytes32 taskHash = primeBetSums[_candidateNumber].taskHash;
   	IEnforcer enforcer = IEnforcer(enforcerAddr);
   	(endTime, pathRoots, results) = enforcer.getStatus(taskHash);
   	require(endTime < now, "bet duration not passed");
@@ -102,24 +145,23 @@ contract PrimeCasino {
   		if (betAmount < 0) {
   			betAmount *= -1;
   		}
-  		require(payoutAmount > 0, "nothing to pay out");
   		payoutAmount = uint256(betAmount);
   	} else {
-	  	uint256 total = primeBetSums[_primeNumber].sumYes + primeBetSums[_primeNumber].sumNo;
+	  	uint256 total = primeBetSums[_candidateNumber].sumYes + primeBetSums[_candidateNumber].sumNo;
 	  	bytes memory result = new bytes(1);
 	  	if (betAmount > 0) {
 	  		result[0] = 0x01;
 	  		require(keccak256(result) == results[0], "bet prime, but not found prime");
 	  		// amount * total / sameSide
-	  		payoutAmount = uint256(betAmount) * total / primeBetSums[_primeNumber].sumYes;
+	  		payoutAmount = uint256(betAmount) * total / primeBetSums[_candidateNumber].sumYes;
 			} else {
 				require(keccak256(result) == results[0], "bet not prime, but found prime");
 				betAmount *= -1;
-				payoutAmount = uint256(betAmount) * total / primeBetSums[_primeNumber].sumNo;
+				payoutAmount = uint256(betAmount) * total / primeBetSums[_candidateNumber].sumNo;
 			}
 		}
 		require(payoutAmount > 0, "nothing to pay out");
-		primeBets[_primeNumber][msg.sender] = 0;
+		primeBets[_candidateNumber][msg.sender] = 0;
     msg.sender.transfer(payoutAmount);
   }
 }

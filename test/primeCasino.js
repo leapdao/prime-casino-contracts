@@ -8,7 +8,6 @@ contract('PrimeCasino', () => {
   let provider = ethers.getDefaultProvider();
   const path = '0x1100000000000000000000000000000000000000000000000000000000000011';
   const yesHash = ethers.utils.solidityKeccak256(['bytes'],['0x01']);
-  console.log(yesHash);
   const noHash = ethers.utils.solidityKeccak256(['bytes'],['0x00']);
   const minBet = toBN('100000000000000000');
   let casino;
