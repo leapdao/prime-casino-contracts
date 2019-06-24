@@ -20,11 +20,17 @@ contract PrimeCasino {
 	mapping(uint256 => mapping(address => int256)) primeBets;
 	mapping(uint256 => Sum) primeBetSums;
 
+
+
 	constructor(address _enforcerAddr, address _primeTester, uint256 _minBet) public {
 		enforcerAddr = _enforcerAddr;
 		minBet = _minBet;
 		primeTester = _primeTester;
 	}
+
+  function getBet(uint256 _candidate, address _bettor) public view returns (int256) {
+    return primeBets[_candidate][_bettor];
+  }
     
   /**
    * @dev request a new `canditateNumber` to be checked for primality.
