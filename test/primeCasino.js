@@ -20,7 +20,7 @@ contract('PrimeCasino', () => {
     casino = await deployContract(PrimeCasino, enforcer.address, enforcer.address, minBet);    
   });
 
-  it('should allow to bet and win', async () => {
+  it('should allow to request and win', async () => {
     // register execution and check state
     let tx = await casino.request(123, {value: minBet});
     tx = await tx.wait();
@@ -32,6 +32,23 @@ contract('PrimeCasino', () => {
     tx = await enforcer.finalizeTask(taskHash);
     await tx.wait();
     tx = await casino.payout(123, { gasLimit: 0x0fffffffffffff});
+    tx = await tx.wait();
+  });
+
+  it('should allow to bet and win', async () => {
+    // register execution and check state
+    let tx = await casino.request(131, {value: minBet});
+    tx = await tx.wait();
+    const taskHash = tx.logs[1].topics[2];
+    tx = await casino.bet(131, true, {value: minBet});
+    tx = await tx.wait();
+
+    // deliver result
+    tx = await enforcer.registerResult(taskHash, path, "0x01");
+    await tx.wait();
+    tx = await enforcer.finalizeTask(taskHash);
+    await tx.wait();
+    tx = await casino.payout(131, { gasLimit: 0x0fffffffffffff});
     tx = await tx.wait();
   });
 

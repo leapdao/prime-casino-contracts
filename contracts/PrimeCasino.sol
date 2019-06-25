@@ -6,6 +6,7 @@ contract PrimeCasino {
 
 	event NewCandidatePrime(uint256 indexed number, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
   event NewBet(uint256 indexed number, bytes32 indexed taskHash, uint256 sumYes, uint256 sumNo);
+  event Payout(uint256 indexed number, address receiver, uint256 amount);
 
 	uint256 public minBet;
 	address public enforcerAddr;
@@ -85,7 +86,7 @@ contract PrimeCasino {
   	IEnforcer enforcer = IEnforcer(enforcerAddr);
   	(endTime ,,) = enforcer.getStatus(taskHash);
   	require(endTime > 0, "not a known bet");
-  	require(endTime > now, "bet duration expired");
+  	require(endTime == 1 || endTime > now, "bet duration expired");
     Sum memory sum = primeBetSums[_candidateNumber];
   	if (_isPrime) {
   		primeBets[_candidateNumber][msg.sender] += int256(msg.value);
@@ -118,14 +119,6 @@ contract PrimeCasino {
   	bytes32 taskHash = sum.taskHash;
   	IEnforcer enforcer = IEnforcer(enforcerAddr);
   	(_challengeEndTime, _pathRoots,) = enforcer.getStatus(taskHash);
-    if (_challengeEndTime == 0) {
-      // why here and not in enforcerMock?
-      // we only want to start the callenge duration after the first result has been
-      // submitted. computation might be long running.
-      // for UI purposes we still return a value here, to distinguish from 
-      // non-existing tasks.
-      _challengeEndTime = now + 2 hours;
-    }
   }
 
   /**
@@ -169,5 +162,6 @@ contract PrimeCasino {
 		require(payoutAmount > 0, "nothing to pay out");
 		primeBets[_candidateNumber][msg.sender] = 0;
     msg.sender.transfer(payoutAmount);
+    emit Payout(_candidateNumber, msg.sender, payoutAmount);
   }
 }

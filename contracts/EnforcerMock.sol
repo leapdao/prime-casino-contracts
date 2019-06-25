@@ -5,7 +5,7 @@ import "./IEnforcer.sol";
 contract EnforcerMock is IEnforcer {
 
   struct Task {
-    uint256 challengeEndTime;
+    uint256 challengeEndTime; // =0 not existing, =1 requested, no result, > 1 result registered 
     bytes32[] pathRoots;
     bytes32[] results;
   }
@@ -45,6 +45,13 @@ contract EnforcerMock is IEnforcer {
     
   function request(EVMParameters memory _params, bytes memory _data) public returns (bytes32) {
     bytes32 taskHash = parameterHash(_params);
+    require(tasks[taskHash].challengeEndTime == 0, "task already requested");
+    bytes32[] memory empty = new bytes32[](0);
+    tasks[taskHash] = Task({
+      challengeEndTime: 1,
+      pathRoots: empty,
+      results: empty
+    });
 		emit Request(taskHash, _data);
     return taskHash;
   }
