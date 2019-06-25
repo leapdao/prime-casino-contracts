@@ -15,7 +15,7 @@ contract EnforcerMock is IEnforcer {
   event Registered(bytes32 indexed _taskHash, bytes32 indexed _pathRoot, bytes result);
 
   function registerResult(bytes32 _taskHash, bytes32 _pathRoot, bytes memory result) public {
-    if (tasks[_taskHash].challengeEndTime == 0) {
+    if (tasks[_taskHash].challengeEndTime <= 1) {
       bytes32[] memory empty = new bytes32[](0);
       tasks[_taskHash] = Task({
         challengeEndTime: now + 2 hours,
