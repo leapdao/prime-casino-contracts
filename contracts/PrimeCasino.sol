@@ -159,9 +159,10 @@ contract PrimeCasino {
 				payoutAmount = uint256(betAmount) * total / primeBetSums[_candidateNumber].sumNo;
 			}
 		}
-		require(payoutAmount > 0, "nothing to pay out");
 		primeBets[_candidateNumber][msg.sender] = 0;
-    msg.sender.transfer(payoutAmount);
+    if (payoutAmount > 0) {
+      msg.sender.transfer(payoutAmount);
+    }
     emit Payout(_candidateNumber, msg.sender, payoutAmount);
   }
 }
