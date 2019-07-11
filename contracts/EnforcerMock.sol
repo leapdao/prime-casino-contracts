@@ -12,8 +12,6 @@ contract EnforcerMock is IEnforcer {
 
   mapping(bytes32 => Task) tasks;
 
-  event Registered(bytes32 indexed _taskHash, bytes32 indexed _pathRoot, bytes result);
-
   function registerResult(bytes32 _taskHash, bytes32 _pathRoot, bytes memory result) public {
     if (tasks[_taskHash].challengeEndTime <= 1) {
       bytes32[] memory empty = new bytes32[](0);
@@ -25,14 +23,12 @@ contract EnforcerMock is IEnforcer {
     }
     tasks[_taskHash].pathRoots.push(_pathRoot);
     tasks[_taskHash].results.push(keccak256(result));
-    emit Registered(_taskHash, _pathRoot, result);
+    emit Registered(_taskHash, _pathRoot, 10, result);
   }
 
   function finalizeTask(bytes32 _taskHash) public {
     tasks[_taskHash].challengeEndTime = now - 1;
   }
-
-  event Request(bytes32 indexed _taskHash, bytes _data);
 
   function parameterHash(EVMParameters memory _parameters) internal returns (bytes32) {
     return keccak256(
@@ -52,13 +48,13 @@ contract EnforcerMock is IEnforcer {
       pathRoots: empty,
       results: empty
     });
-		emit Request(taskHash, _data);
+    emit Requested(taskHash, _params, _data);
     return taskHash;
   }
 
   function getStatus(bytes32 _taskHash) public view returns (uint256, bytes32[] memory, bytes32[] memory) {
     Task memory task = tasks[_taskHash];
-  	return(task.challengeEndTime, task.pathRoots, task.results);
+    return(task.challengeEndTime, task.pathRoots, task.results);
   }
 
 }
