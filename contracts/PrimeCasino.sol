@@ -46,7 +46,8 @@ contract PrimeCasino {
   function request(uint256 _candidateNumber) public payable {
     require(msg.value >= minBet, "Not enough ether sent to pay for bet");
     IEnforcer enforcer = IEnforcer(enforcerAddr);
-    bytes memory data = abi.encodePacked(_candidateNumber);
+    bytes4 sig = 0x686109bb;
+    bytes memory data = abi.encodePacked(sig, _candidateNumber, blockhash(block.number - 1));
     IEnforcer.EVMParameters memory params = IEnforcer.EVMParameters({
       origin: msg.sender,
       target: primeTester,
