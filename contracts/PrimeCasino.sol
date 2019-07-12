@@ -45,6 +45,7 @@ contract PrimeCasino {
    */
   function request(uint256 _candidateNumber) public payable {
     require(msg.value >= minBet, "Not enough ether sent to pay for bet");
+    require(primeBetSums[_candidateNumber].taskHash == 0, "number already requested");
     IEnforcer enforcer = IEnforcer(enforcerAddr);
     bytes4 sig = 0x686109bb;
     bytes memory data = abi.encodePacked(sig, _candidateNumber, blockhash(block.number - 1));
